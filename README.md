@@ -21,10 +21,28 @@ Or just copy the script you want into your `PATH`.
 
 ## gpu-toggle
 
-Hybrid-graphics laptops run hotter and louder with the NVIDIA GPU active.
-`gpu-toggle` flips between two modes with `prime-select`:
+### Why
 
-- **intel**: NVIDIA GPU off. Cooler, quieter, better battery.
+The NVIDIA GPU is powerful, but it comes at a cost: when it's in use, the
+laptop can quickly heat up and the battery drains noticeably faster.
+
+Most of the time you don't need it. Without an external monitor, the Intel
+integrated GPU handles everyday work (browsing, coding, video) perfectly well.
+Switching the NVIDIA GPU off keeps the laptop much cooler and makes the
+battery last longer.
+
+An external monitor, however, needs the NVIDIA GPU. Switching by hand with
+`prime-select` and logging out every time gets tedious, so `gpu-toggle` does
+it in one command:
+
+- On the go, no external monitor: `gpu-toggle intel`
+- At the desk with an external monitor: `gpu-toggle on-demand`
+
+### Modes
+
+`gpu-toggle` switches between these modes with `prime-select`:
+
+- **intel**: NVIDIA GPU off. Cooler, with longer battery life.
 - **on-demand**: Intel drives the desktop, NVIDIA is available. Needed for
   external monitors wired to the NVIDIA GPU (the case on the X1 Extreme's HDMI port).
 
