@@ -1,0 +1,83 @@
+#!/bin/bash
+# gpu-toggle: Quickly switch between Intel (Cool) and NVIDIA (Monitor) modes
+#
+# Usage: gpu-toggle [-y] [intel|on-demand|nvidia|status]
+#   No mode given: toggle between intel and on-demand.
+#   -y: skip the confirmation prompt.
+
+set -euo pipefail
+
+usage() {
+  echo "Usage: $(basename "$0") [-y] [intel|on-demand|nvidia|status]"
+}
+
+ASSUME_YES=0
+TARGET=""
+
+for arg in "$@"; do
+  case "$arg" in
+    -y|--yes) ASSUME_YES=1 ;;
+    -h|--help) usage; exit 0 ;;
+    intel|on-demand|nvidia|status) TARGET="$arg" ;;
+    *) usage >&2; exit 1 ;;
+  esac
+done
+
+if ! command -v prime-select >/dev/null 2>&1; then
+  echo "Error: prime-select not found. Install the nvidia-prime package." >&2
+  exit 1
+fi
+
+CURRENT=$(prime-select query)
+
+if [ "$TARGET" = "status" ]; then
+  echo "$CURRENT"
+  exit 0
+fi
+
+if [ -z "$TARGET" ]; then
+  if [ "$CURRENT" = "intel" ]; then
+    TARGET="on-demand"
+  else
+    TARGET="intel"
+  fi
+fi
+
+if [ "$TARGET" = "$CURRENT" ]; then
+  echo "Already in '$CURRENT' mode. Nothing to do."
+  exit 0
+fi
+
+if [ "$EUID" -ne 0 ]; then
+  exec sudo "$0" "$@"
+fi
+
+echo "⚠️  WARNING: This will instantly kill your desktop session."
+echo "All unsaved work will be lost."
+
+if [ "$ASSUME_YES" -ne 1 ]; then
+  read -p "Switch from '$CURRENT' to '$TARGET'? [y/N] " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 1
+  fi
+fi
+
+case "$TARGET" in
+  intel)     echo "Switching to Intel Only (Cooling Mode)..." ;;
+  on-demand) echo "Switching to NVIDIA On-Demand (Monitor Mode)..." ;;
+  nvidia)    echo "Switching to NVIDIA Performance Mode..." ;;
+esac
+prime-select "$TARGET"
+
+# display-manager.service is an alias for gdm, sddm, lightdm, ...
+DM=$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" .service)
+if [ -z "$DM" ] || [ "$DM" = "display-manager" ]; then
+  echo "Could not detect the display manager. Log out or reboot to apply."
+  exit 0
+fi
+
+echo "Restarting $DM in 2 seconds..."
+sleep 2
+systemctl restart "$DM"
