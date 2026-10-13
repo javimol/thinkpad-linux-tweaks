@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
 PREFIX=${PREFIX:-/usr/local}
 
-TOOLS="gpu-toggle"
+TOOLS="gpu-toggle gpu-toggle-auto"
 
 install_gpu_toggle() {
   install -Dm755 "$REPO_DIR/generic/gpu-toggle" "$PREFIX/bin/gpu-toggle"
@@ -17,6 +17,16 @@ install_gpu_toggle() {
   if [ -d /etc/tlp.d ]; then
     install_gpu_toggle_tlp
   fi
+}
+
+# Boot service: pick intel or on-demand from the connected monitors
+install_gpu_toggle_auto() {
+  install_gpu_toggle
+  sed "s#/usr/local/bin/#$PREFIX/bin/#" "$REPO_DIR/generic/gpu-toggle-auto.service" \
+    > /etc/systemd/system/gpu-toggle-auto.service
+  systemctl daemon-reload
+  systemctl enable gpu-toggle-auto.service
+  echo "Installed and enabled gpu-toggle-auto.service (runs at next boot)"
 }
 
 # TLP keeps every PCI device powered while on AC (RUNTIME_PM_ON_AC=on), which
@@ -60,6 +70,7 @@ fi
 for tool in "$@"; do
   case "$tool" in
     gpu-toggle) install_gpu_toggle ;;
+    gpu-toggle-auto) install_gpu_toggle_auto ;;
     *) echo "Unknown tool: $tool (available: $TOOLS)" >&2; exit 1 ;;
   esac
 done

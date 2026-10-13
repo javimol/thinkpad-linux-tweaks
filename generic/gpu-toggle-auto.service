@@ -1,0 +1,15 @@
+# Pick the GPU mode at boot, before the login screen:
+# external monitor connected -> on-demand, otherwise intel.
+[Unit]
+Description=Choose GPU mode from connected monitors (gpu-toggle auto)
+After=systemd-modules-load.service systemd-udev-trigger.service
+Before=display-manager.service gpu-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/gpu-toggle auto
+# Switching modes rebuilds the initramfs
+TimeoutStartSec=180
+
+[Install]
+WantedBy=display-manager.service

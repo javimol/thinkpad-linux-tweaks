@@ -7,7 +7,7 @@ Tested on: ThinkPad X1 Extreme Gen 2 (i7 + GTX 1650 Max-Q), Ubuntu 24.04, NVIDIA
 
 | Tool | What it does | Works on |
 |---|---|---|
-| [`gpu-toggle`](generic/gpu-toggle) | Switch between Intel-only and NVIDIA modes in one command | Any Ubuntu/Debian laptop with Intel + NVIDIA (Optimus) graphics |
+| [`gpu-toggle`](generic/gpu-toggle) | Switch between Intel-only and NVIDIA modes in one command, or automatically at boot | Any Ubuntu/Debian laptop with Intel + NVIDIA (Optimus) graphics |
 
 ## Install
 
@@ -56,6 +56,25 @@ gpu-toggle -y intel     # skip the confirmation prompt
 
 > ⚠️ Switching restarts your display manager, which **ends your desktop session
 > immediately**. Save your work first.
+
+### Automatic mode at boot
+
+`gpu-toggle-auto.service` picks the mode before the login screen starts:
+**external monitor connected → on-demand, otherwise → intel**. It briefly
+loads the NVIDIA driver to check the GPU's ports (they are all wired to the
+NVIDIA GPU), then switches if needed.
+
+```bash
+sudo ./install.sh gpu-toggle-auto
+sudo systemctl disable gpu-toggle-auto   # to turn it off
+journalctl -u gpu-toggle-auto -b         # what it decided at boot
+```
+
+- Booting takes longer when the mode changes, because `prime-select` rebuilds
+  the initramfs. When the mode stays the same, it adds about a second.
+- If you chose `nvidia` mode by hand, it is left alone.
+- Monitors on a Thunderbolt dock may not be detected yet that early in boot.
+- Plugging or unplugging a monitor after login still needs `gpu-toggle`.
 
 **TLP users:** by default TLP keeps all PCI devices powered while on AC, so the
 NVIDIA GPU never powers off. `install.sh` adds `/etc/tlp.d/50-gpu-toggle.conf`
