@@ -42,19 +42,24 @@ it in one command:
 
 `gpu-toggle` switches between these modes with `prime-select`:
 
-- **intel**: NVIDIA GPU off. Cooler, with longer battery life.
+- **intel**: NVIDIA GPU fully powered off (D3cold). Cooler, with longer battery life.
+  `gpu-toggle` unloads the NVIDIA driver right away, so no reboot is needed.
 - **on-demand**: Intel drives the desktop, NVIDIA is available. Needed for
   external monitors wired to the NVIDIA GPU (the case on the X1 Extreme's HDMI port).
 
 ```bash
 gpu-toggle              # toggle between intel and on-demand
 gpu-toggle nvidia       # switch to a specific mode (intel | on-demand | nvidia)
-gpu-toggle status       # print the current mode
+gpu-toggle status       # print the current mode and the GPU's power state
 gpu-toggle -y intel     # skip the confirmation prompt
 ```
 
 > ⚠️ Switching restarts your display manager, which **ends your desktop session
 > immediately**. Save your work first.
+
+**TLP users:** by default TLP keeps all PCI devices powered while on AC, so the
+NVIDIA GPU never powers off. `install.sh` adds `/etc/tlp.d/50-gpu-toggle.conf`
+to exempt the GPU and its PCIe port.
 
 **Requirements**
 

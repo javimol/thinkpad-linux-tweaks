@@ -14,6 +14,36 @@ TOOLS="gpu-toggle"
 install_gpu_toggle() {
   install -Dm755 "$REPO_DIR/generic/gpu-toggle" "$PREFIX/bin/gpu-toggle"
   echo "Installed $PREFIX/bin/gpu-toggle"
+  if [ -d /etc/tlp.d ]; then
+    install_gpu_toggle_tlp
+  fi
+}
+
+# TLP keeps every PCI device powered while on AC (RUNTIME_PM_ON_AC=on), which
+# stops the NVIDIA GPU from powering off in intel mode. Exempt the GPU's
+# functions and its PCIe port.
+install_gpu_toggle_tlp() {
+  local d gpu addrs="" conf=/etc/tlp.d/50-gpu-toggle.conf
+  for d in /sys/bus/pci/devices/*; do
+    if [ "$(cat "$d/vendor")" = "0x10de" ] && [[ "$(cat "$d/class")" == 0x03* ]]; then
+      gpu=$(readlink -f "$d")
+      break
+    fi
+  done
+  if [ -z "${gpu:-}" ]; then
+    echo "No NVIDIA GPU found; skipping $conf"
+    return 0
+  fi
+  for d in "${gpu%.*}".* "$(dirname "$gpu")"; do
+    addrs="$addrs ${d##*/0000:}"
+  done
+  cat > "$conf" <<CONF
+# Written by thinkpad-linux-tweaks install.sh (gpu-toggle).
+# Let the NVIDIA GPU and its PCIe port power off even on AC.
+RUNTIME_PM_ENABLE="${addrs# }"
+CONF
+  echo "Installed $conf (RUNTIME_PM_ENABLE=\"${addrs# }\")"
+  tlp start >/dev/null 2>&1 || true
 }
 
 if [ $# -eq 0 ] || [ "$1" = "--list" ]; then

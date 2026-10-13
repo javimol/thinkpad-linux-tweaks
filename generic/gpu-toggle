@@ -4,12 +4,85 @@
 # Usage: gpu-toggle [-y] [intel|on-demand|nvidia|status]
 #   No mode given: toggle between intel and on-demand.
 #   -y: skip the confirmation prompt.
+#
+# Switching to intel also unloads the NVIDIA driver and lets the kernel cut
+# the GPU's power (D3cold), without waiting for a reboot.
 
 set -euo pipefail
+
+NVIDIA_MODULES="nvidia_uvm nvidia_drm nvidia_modeset nvidia"
 
 usage() {
   echo "Usage: $(basename "$0") [-y] [intel|on-demand|nvidia|status]"
 }
+
+# sysfs path of the NVIDIA display controller (PCI class 0x03xxxx)
+find_gpu() {
+  local d
+  for d in /sys/bus/pci/devices/*; do
+    if [ "$(cat "$d/vendor")" = "0x10de" ] && [[ "$(cat "$d/class")" == 0x03* ]]; then
+      readlink -f "$d"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# The GPU's own functions (display, HDMI audio, ...) plus the PCIe port above
+# it. All of them must be allowed to suspend for the slot to lose power.
+gpu_power_devices() {
+  local gpu=$1
+  ls -d "${gpu%.*}".*
+  dirname "$gpu"
+}
+
+gpu_power_state() {
+  local gpu
+  gpu=$(find_gpu) || { echo "not found"; return 0; }
+  cat "$gpu/power_state" 2>/dev/null || echo "unknown"
+}
+
+# Runs outside the desktop session (via systemd-run), so it survives the
+# display manager being stopped. Must never leave the system without a login
+# screen, so errors are logged and skipped.
+apply_switch() {
+  local target=$1 dm=$2 gpu dev i
+  set +e
+
+  echo "Stopping $dm..."
+  systemctl stop "$dm"
+
+  if [ "$target" = "intel" ]; then
+    systemctl stop nvidia-persistenced 2>/dev/null
+    for i in 1 2 3 4 5; do
+      # shellcheck disable=SC2086
+      modprobe -r $NVIDIA_MODULES 2>/dev/null && break
+      sleep 1
+    done
+    if lsmod | grep -q '^nvidia'; then
+      echo "Warning: could not unload the NVIDIA driver; reboot to power the GPU off."
+    elif gpu=$(find_gpu); then
+      for dev in $(gpu_power_devices "$gpu"); do
+        echo auto > "$dev/power/control"
+      done
+      for i in $(seq 1 15); do
+        [ "$(cat "$gpu/power_state")" = "D3cold" ] && break
+        sleep 1
+      done
+      echo "NVIDIA GPU power state: $(cat "$gpu/power_state")"
+    fi
+  else
+    modprobe nvidia_drm || echo "Warning: could not load the NVIDIA driver."
+  fi
+
+  echo "Starting $dm..."
+  systemctl start "$dm"
+}
+
+if [ "${1:-}" = "--apply" ]; then
+  apply_switch "$2" "$3"
+  exit 0
+fi
 
 ASSUME_YES=0
 TARGET=""
@@ -31,7 +104,8 @@ fi
 CURRENT=$(prime-select query)
 
 if [ "$TARGET" = "status" ]; then
-  echo "$CURRENT"
+  echo "Mode: $CURRENT"
+  echo "NVIDIA GPU power state: $(gpu_power_state)  (D3cold = no power)"
   exit 0
 fi
 
@@ -43,9 +117,14 @@ if [ -z "$TARGET" ]; then
   fi
 fi
 
+# In intel mode, also act when the GPU is still powered (e.g. something loaded
+# the NVIDIA driver after the switch).
 if [ "$TARGET" = "$CURRENT" ]; then
-  echo "Already in '$CURRENT' mode. Nothing to do."
-  exit 0
+  if [ "$TARGET" != "intel" ] || [ "$(gpu_power_state)" = "D3cold" ]; then
+    echo "Already in '$CURRENT' mode. Nothing to do."
+    exit 0
+  fi
+  echo "Already in 'intel' mode, but the NVIDIA GPU is still powered ($(gpu_power_state))."
 fi
 
 if [ "$EUID" -ne 0 ]; then
@@ -56,7 +135,7 @@ echo "⚠️  WARNING: This will instantly kill your desktop session."
 echo "All unsaved work will be lost."
 
 if [ "$ASSUME_YES" -ne 1 ]; then
-  read -p "Switch from '$CURRENT' to '$TARGET'? [y/N] " -n 1 -r
+  read -p "Switch to '$TARGET'? [y/N] " -n 1 -r
   echo
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Aborted."
@@ -69,15 +148,18 @@ case "$TARGET" in
   on-demand) echo "Switching to NVIDIA On-Demand (Monitor Mode)..." ;;
   nvidia)    echo "Switching to NVIDIA Performance Mode..." ;;
 esac
-prime-select "$TARGET"
+if [ "$TARGET" != "$CURRENT" ]; then
+  prime-select "$TARGET"
+fi
 
 # display-manager.service is an alias for gdm, sddm, lightdm, ...
 DM=$(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" .service)
 if [ -z "$DM" ] || [ "$DM" = "display-manager" ]; then
-  echo "Could not detect the display manager. Log out or reboot to apply."
+  echo "Could not detect the display manager. Reboot to apply."
   exit 0
 fi
 
-echo "Restarting $DM in 2 seconds..."
+echo "Restarting $DM in 2 seconds... (log: journalctl -u gpu-toggle)"
 sleep 2
-systemctl restart "$DM"
+systemd-run --quiet --collect --no-block --unit=gpu-toggle \
+  "$(readlink -f "$0")" --apply "$TARGET" "$DM"
