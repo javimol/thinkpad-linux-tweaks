@@ -89,8 +89,14 @@ to exempt the GPU and its PCIe port.
 
 ## Contributing
 
-Tried a tool on another machine? Please open an issue or PR saying what
-worked, so the "Works on" column can grow.
+Tried a tool on another machine? Please
+[open a test report](https://github.com/javimol/thinkpad-linux-tweaks/issues/new?template=tested-on.yml),
+whether it worked or not, so the "Works on" column can grow.
+
+Especially welcome:
+- Test reports from other Intel + NVIDIA laptops
+- Support for non-Ubuntu distros (Fedora, Arch, ...) that don't have `prime-select`
+- New tweaks for the X1 Extreme or other ThinkPads (open a PR)
 
 ## License
 

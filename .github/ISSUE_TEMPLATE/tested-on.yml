@@ -1,0 +1,56 @@
+name: Tested on my laptop
+description: Report whether a tool works on your machine (works or not, both help)
+title: "Tested: <tool> on <laptop model>"
+labels: ["test-report"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for testing! Reports from other laptops help grow the "Works on" list.
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Tool
+      options:
+        - gpu-toggle
+        - gpu-toggle-auto (boot service)
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Laptop model
+      placeholder: e.g. ThinkPad P1 Gen 2, Dell XPS 15 9570
+    validations:
+      required: true
+  - type: input
+    id: distro
+    attributes:
+      label: Distro and version
+      placeholder: e.g. Ubuntu 24.04
+    validations:
+      required: true
+  - type: input
+    id: driver
+    attributes:
+      label: NVIDIA driver version
+      description: Output of `nvidia-smi --query-gpu=driver_version --format=csv,noheader` (in on-demand mode)
+  - type: dropdown
+    id: result
+    attributes:
+      label: Did it work?
+      options:
+        - "Yes, fully"
+        - "Partly"
+        - "No"
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Output of `gpu-toggle status` in intel mode
+      render: text
+  - type: textarea
+    id: notes
+    attributes:
+      label: What happened / notes
+      description: Anything that didn't work, and for gpu-toggle-auto the output of `journalctl -u gpu-toggle-auto -b`.
