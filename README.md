@@ -88,6 +88,19 @@ to exempt the GPU and its PCIe port.
 - systemd. The display manager (GDM, SDDM, LightDM, ...) is detected automatically.
   If it can't be detected, log out or reboot after switching.
 
+## Desktop tweaks
+
+Small one-off settings, not tied to any hardware.
+
+**Snap windows left and right without interruption (Ubuntu).** After you snap
+a window to one half with Super+Right, Ubuntu's Tiling Assistant opens a
+picker to fill the other half. The picker takes the keyboard, so pressing
+Super+Left straight away doesn't move the window. To turn the picker off:
+
+```bash
+gsettings set org.gnome.shell.extensions.tiling-assistant enable-tiling-popup false
+```
+
 ## Contributing
 
 Tried a tool on another machine? Please
