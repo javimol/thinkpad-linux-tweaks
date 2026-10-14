@@ -52,6 +52,7 @@ gpu-toggle              # toggle between intel and on-demand
 gpu-toggle nvidia       # switch to a specific mode (intel | on-demand | nvidia)
 gpu-toggle status       # print the current mode and the GPU's power state
 gpu-toggle -y intel     # skip the confirmation prompt
+gpu-toggle report       # print system details for a test report
 ```
 
 > ⚠️ Switching restarts your display manager, which **ends your desktop session
@@ -92,6 +93,46 @@ to exempt the GPU and its PCIe port.
 Tried a tool on another machine? Please
 [open a test report](https://github.com/javimol/thinkpad-linux-tweaks/issues/new?template=tested-on.yml),
 whether it worked or not, so the "Works on" column can grow.
+Paste the output of `gpu-toggle report` (run it in intel mode).
+
+<details>
+<summary>Example: a working setup (X1 Extreme Gen 2, intel mode)</summary>
+
+```text
+## gpu-toggle report
+Laptop:  LENOVO ThinkPad X1 Extreme 2nd (20QVCTO1WW)
+Distro:  Ubuntu 24.04.5 LTS
+Kernel:  7.0.0-38-generic
+NVIDIA driver: 595.99.02
+Mode:    intel
+Display manager: gdm
+TLP:     1.6.1-1ubuntu1
+         defaults.conf L0041: RUNTIME_PM_ON_AC="on"
+         defaults.conf L0042: RUNTIME_PM_ON_BAT="auto"
+         /etc/tlp.d/50-gpu-toggle.conf L0003: RUNTIME_PM_ENABLE="01:00.0 01:00.1 00:01.0"
+GPUs:
+  00:02.0 VGA compatible controller [0300]: Intel Corporation CoffeeLake-H GT2 [UHD Graphics 630] [8086:3e9b]
+  01:00.0 VGA compatible controller [0300]: NVIDIA Corporation TU117M [GeForce GTX 1650 Mobile / Max-Q] [10de:1f91] (rev a1)
+NVIDIA power (device control runtime_status power_state):
+  0000:01:00.0 auto suspended D3cold
+  0000:01:00.1 auto suspended D3cold
+  0000:00:01.0 auto suspended D3cold
+NVIDIA ports:
+  (NVIDIA driver not loaded)
+Ports on other GPUs:
+  card1-eDP-1 connected
+gpu-toggle-auto: enabled
+  External monitor: no -> 'intel'
+```
+
+What to look for:
+- **NVIDIA power:** every line ends in `D3cold`, meaning the GPU gets no power.
+  `D0` means it is fully on.
+- **TLP:** if `RUNTIME_PM_ON_AC="on"` is set, the `RUNTIME_PM_ENABLE` line from
+  `50-gpu-toggle.conf` must be there too, or the GPU stays on while on AC.
+- **NVIDIA ports:** in intel mode the driver is unloaded, so no ports are listed.
+
+</details>
 
 Especially welcome:
 - Test reports from other Intel + NVIDIA laptops

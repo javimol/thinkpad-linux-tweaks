@@ -1,11 +1,12 @@
 #!/bin/bash
 # gpu-toggle: Quickly switch between Intel (Cool) and NVIDIA (Monitor) modes
 #
-# Usage: gpu-toggle [-y] [intel|on-demand|nvidia|status|auto]
+# Usage: gpu-toggle [-y] [intel|on-demand|nvidia|status|auto|report]
 #   No mode given: toggle between intel and on-demand.
 #   -y: skip the confirmation prompt.
 #   auto: for boot, before the login screen starts (gpu-toggle-auto.service).
 #         External monitor connected -> on-demand, otherwise intel.
+#   report: print system details to paste into a test report.
 #
 # Switching to intel also unloads the NVIDIA driver and lets the kernel cut
 # the GPU's power (D3cold), without waiting for a reboot.
@@ -15,7 +16,7 @@ set -euo pipefail
 NVIDIA_MODULES="nvidia_uvm nvidia_drm nvidia_modeset nvidia"
 
 usage() {
-  echo "Usage: $(basename "$0") [-y] [intel|on-demand|nvidia|status|auto]"
+  echo "Usage: $(basename "$0") [-y] [intel|on-demand|nvidia|status|auto|report]"
 }
 
 # sysfs path of the NVIDIA display controller (PCI class 0x03xxxx)
@@ -71,7 +72,11 @@ power_off_gpu() {
     [ "$(cat "$gpu/power_state")" = "D3cold" ] && break
     sleep 1
   done
-  echo "NVIDIA GPU power state: $(cat "$gpu/power_state")"
+  if [ "$(cat "$gpu/power_state")" = "D3cold" ]; then
+    echo "NVIDIA GPU power state: D3cold"
+  else
+    echo "NVIDIA GPU power state: $(cat "$gpu/power_state") (still powering down; check with 'gpu-toggle status')"
+  fi
 }
 
 # All external ports are wired to the NVIDIA GPU, so its driver must be
@@ -149,6 +154,54 @@ apply_switch() {
   echo "Starting $dm..."
   systemctl start "$dm"
 }
+
+# System details for test reports. Read-only, needs no root.
+report() {
+  local id=/sys/class/dmi/id gpu dev status
+  set +e
+  echo "## gpu-toggle report"
+  echo "Laptop:  $(cat $id/sys_vendor) $(cat $id/product_version) ($(cat $id/product_name))"
+  echo "Distro:  $(. /etc/os-release && echo "$PRETTY_NAME")"
+  echo "Kernel:  $(uname -r)"
+  echo "NVIDIA driver: $(modinfo -F version nvidia 2>/dev/null || echo "not found")"
+  echo "Mode:    $(prime-select query 2>/dev/null || echo "prime-select not installed")"
+  echo "Display manager: $(basename "$(readlink -f /etc/systemd/system/display-manager.service 2>/dev/null)" .service)"
+  if command -v tlp >/dev/null 2>&1; then
+    echo "TLP:     $(dpkg-query -W -f='${Version}' tlp 2>/dev/null || rpm -q tlp 2>/dev/null || echo "installed")"
+    tlp-stat -c 2>/dev/null | grep -E ' RUNTIME_PM_(ON_AC|ON_BAT|ENABLE)=' | sed 's/^/         /'
+  else
+    echo "TLP:     not installed"
+  fi
+  echo "GPUs:"
+  lspci -nn 2>/dev/null | grep -E 'VGA|3D|Display' | sed 's/^/  /'
+  if gpu=$(find_gpu); then
+    echo "NVIDIA power (device control runtime_status power_state):"
+    for dev in $(gpu_power_devices "$gpu"); do
+      echo "  ${dev##*/} $(cat "$dev/power/control") $(cat "$dev/power/runtime_status") $(cat "$dev/power_state" 2>/dev/null)"
+    done
+    grep -h 'Runtime D3 status' /proc/driver/nvidia/gpus/*/power 2>/dev/null | sed 's/^/  /'
+    echo "NVIDIA ports:"
+    if ls "$gpu"/drm/card*/card*-*/status >/dev/null 2>&1; then
+      for status in "$gpu"/drm/card*/card*-*/status; do
+        echo "  $(basename "$(dirname "$status")") $(cat "$status")"
+      done
+    else
+      echo "  (NVIDIA driver not loaded)"
+    fi
+  fi
+  echo "Ports on other GPUs:"
+  for status in /sys/class/drm/card*-*/status; do
+    [ -n "${gpu:-}" ] && [[ "$(readlink -f "$status")" == "$gpu"/* ]] && continue
+    echo "  $(basename "$(dirname "$status")") $(cat "$status")"
+  done
+  echo "gpu-toggle-auto: $(systemctl is-enabled gpu-toggle-auto 2>/dev/null || echo "not installed")"
+  journalctl -u gpu-toggle-auto -b --no-pager -o cat 2>/dev/null | grep -vE 'Starting|Finished|Deactivated|Consumed' | sed 's/^/  /'
+}
+
+if [ "${1:-}" = "report" ]; then
+  report
+  exit 0
+fi
 
 if [ "${1:-}" = "--apply" ]; then
   apply_switch "$2" "$3"

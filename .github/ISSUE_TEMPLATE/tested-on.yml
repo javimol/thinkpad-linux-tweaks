@@ -15,25 +15,6 @@ body:
         - gpu-toggle-auto (boot service)
     validations:
       required: true
-  - type: input
-    id: model
-    attributes:
-      label: Laptop model
-      placeholder: e.g. ThinkPad P1 Gen 2, Dell XPS 15 9570
-    validations:
-      required: true
-  - type: input
-    id: distro
-    attributes:
-      label: Distro and version
-      placeholder: e.g. Ubuntu 24.04
-    validations:
-      required: true
-  - type: input
-    id: driver
-    attributes:
-      label: NVIDIA driver version
-      description: Output of `nvidia-smi --query-gpu=driver_version --format=csv,noheader` (in on-demand mode)
   - type: dropdown
     id: result
     attributes:
@@ -45,12 +26,22 @@ body:
     validations:
       required: true
   - type: textarea
-    id: status
+    id: report
     attributes:
-      label: Output of `gpu-toggle status` in intel mode
+      label: Output of `gpu-toggle report`
+      description: |
+        Run this in a terminal and paste the whole output here. It only reads system information.
+
+        ```bash
+        gpu-toggle report
+        ```
+
+        Please run it in **intel** mode (`gpu-toggle intel` first), so it shows whether the NVIDIA GPU reaches `D3cold`.
       render: text
+    validations:
+      required: true
   - type: textarea
     id: notes
     attributes:
       label: What happened / notes
-      description: Anything that didn't work, and for gpu-toggle-auto the output of `journalctl -u gpu-toggle-auto -b`.
+      description: Anything that didn't work, error messages, or what you expected instead.
