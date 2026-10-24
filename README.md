@@ -101,6 +101,15 @@ Super+Left straight away doesn't move the window. To turn the picker off:
 gsettings set org.gnome.shell.extensions.tiling-assistant enable-tiling-popup false
 ```
 
+**Make Alt+Tab go back to the last window (Ubuntu).** When you focus a
+snapped window, Tiling Assistant also raises the window snapped next to it.
+That puts the neighbour ahead in the Alt+Tab order, so Alt+Tab jumps to it
+instead of the window you just left. To raise only the window you pick:
+
+```bash
+gsettings set org.gnome.shell.extensions.tiling-assistant enable-raise-tile-group false
+```
+
 ## Contributing
 
 Tried a tool on another machine? Please
