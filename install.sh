@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
 PREFIX=${PREFIX:-/usr/local}
 
-TOOLS="gpu-toggle gpu-toggle-auto fingerprint-lid"
+TOOLS="gpu-toggle gpu-toggle-auto fingerprint-lid shortcut-check"
 
 install_gpu_toggle() {
   install -Dm755 "$REPO_DIR/generic/gpu-toggle" "$PREFIX/bin/gpu-toggle"
@@ -67,6 +67,11 @@ install_fingerprint_lid() {
   echo "Installed $PREFIX/libexec/lid-open and enabled the fingerprint-lid PAM profile"
 }
 
+install_shortcut_check() {
+  install -Dm755 "$REPO_DIR/generic/shortcut-check" "$PREFIX/bin/shortcut-check"
+  echo "Installed $PREFIX/bin/shortcut-check (run it as your own user, not with sudo)"
+}
+
 if [ $# -eq 0 ] || [ "$1" = "--list" ]; then
   echo "Available tools: $TOOLS"
   echo "Usage: sudo $0 <tool>..."
@@ -83,6 +88,7 @@ for tool in "$@"; do
     gpu-toggle) install_gpu_toggle ;;
     gpu-toggle-auto) install_gpu_toggle_auto ;;
     fingerprint-lid) install_fingerprint_lid ;;
+    shortcut-check) install_shortcut_check ;;
     *) echo "Unknown tool: $tool (available: $TOOLS)" >&2; exit 1 ;;
   esac
 done

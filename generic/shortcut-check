@@ -1,0 +1,132 @@
+#!/bin/bash
+# shortcut-check: find GNOME keyboard shortcuts that differ from the default
+#
+# Usage: shortcut-check [--list|--all]
+#   No option: show each changed shortcut and ask whether to reset it to the
+#              default.
+#   --list: print the changed shortcuts without asking.
+#   --all:  print every shortcut, marking the changed ones.
+#
+# A shortcut recorded in Settings while Fn Lock is off gets the media key
+# (e.g. <Alt>AudioMicMute) instead of the F-key (<Alt>F4). Such shortcuts are
+# flagged, since the media function usually takes the key first.
+
+set -euo pipefail
+
+# Schemas holding shortcuts. Custom shortcuts (media-keys custom-keybindings)
+# have no default, so they are left out.
+SCHEMA_PATTERN='keybindings$|media-keys$|tiling-assistant$'
+
+# Keys on the F-row that GNOME names after their media function
+MEDIA_KEY_PATTERN='>(XF86)?(Audio|MonBrightness|KbdBrightness|Display|WLAN|Tools|Bluetooth|Messenger|Favorites|Phone|Calculator|Launch|Mail|Search|Explorer)'
+
+usage() {
+  echo "Usage: $(basename "$0") [--list|--all]"
+}
+
+# ['<Alt>F4', '<Primary><Super>d'] -> Alt+F4, Ctrl+Super+D
+pretty() {
+  local v=$1
+  v=${v#@as }
+  v=${v#[}
+  v=${v%]}
+  v=${v//\'/}
+  [ -z "$v" ] && { echo "(none)"; return; }
+  echo "$v" | sed -E 's/<(Primary|Control|Ctrl)>/Ctrl+/g; s/<([A-Za-z]+)>/\1+/g;
+    s/\+([a-z])(,|$)/+\U\1\E\2/g'
+}
+
+# show-desktop -> Show desktop
+title() {
+  local t=${1//-/ }
+  echo "${t^}"
+}
+
+# "schema key current default" for every shortcut
+list_shortcuts() {
+  local schema key current default
+  for schema in $(gsettings list-schemas | grep -E "$SCHEMA_PATTERN" | sort); do
+    for key in $(gsettings list-keys "$schema" | sort); do
+      [ "$key" = "custom-keybindings" ] && continue
+      [ "$(gsettings range "$schema" "$key" | head -1)" = "type as" ] || continue
+      current=$(gsettings get "$schema" "$key")
+      # The memory backend ignores user settings, so it reports the default
+      default=$(GSETTINGS_BACKEND=memory gsettings get "$schema" "$key")
+      printf '%s\t%s\t%s\t%s\n' "$schema" "$key" "$current" "$default"
+    done
+  done
+}
+
+show() {
+  local schema=$1 key=$2 current=$3 default=$4 mark=${5:-}
+  if [ "$current" = "$default" ]; then
+    echo "${mark}$(title "$key"): $(pretty "$current")"
+    return
+  fi
+  echo "${mark}$(title "$key")  (${schema#org.gnome.} $key)"
+  echo "    now:     $(pretty "$current")"
+  echo "    default: $(pretty "$default")"
+  if [[ "$schema" != *media-keys ]] && [[ "$current" =~ $MEDIA_KEY_PATTERN ]]; then
+    echo "    warning: uses a media key; was it recorded with Fn Lock off?"
+  fi
+}
+
+mode=ask
+case "${1:-}" in
+  "") ;;
+  --list) mode=list ;;
+  --all) mode=all ;;
+  -h|--help) usage; exit 0 ;;
+  *) usage >&2; exit 1 ;;
+esac
+
+if [ "$EUID" -eq 0 ]; then
+  echo "Error: run as your own user, not root; shortcuts are per-user settings." >&2
+  exit 1
+fi
+
+mapfile -t shortcuts < <(list_shortcuts)
+
+changed=()
+for line in "${shortcuts[@]}"; do
+  IFS=$'\t' read -r schema key current default <<< "$line"
+  if [ "$current" = "$default" ]; then
+    [ "$mode" = all ] && show "$schema" "$key" "$current" "$default" "  "
+    continue
+  fi
+  changed+=("$line")
+  [ "$mode" = all ] && show "$schema" "$key" "$current" "$default" "* "
+done
+
+if [ ${#changed[@]} -eq 0 ]; then
+  echo "All shortcuts are at their defaults."
+  exit 0
+fi
+
+if [ "$mode" = all ]; then
+  echo
+  echo "* ${#changed[@]} changed from the default"
+  exit 0
+fi
+
+echo "${#changed[@]} shortcuts differ from the default."
+n=0
+for line in "${changed[@]}"; do
+  IFS=$'\t' read -r schema key current default <<< "$line"
+  n=$((n + 1))
+  echo
+  [ "$mode" = ask ] && echo "[$n/${#changed[@]}]"
+  show "$schema" "$key" "$current" "$default"
+  [ "$mode" = list ] && continue
+  while true; do
+    read -rp "    Reset to the default? [y/N, q to quit] " answer < /dev/tty
+    case "${answer:-n}" in
+      y|Y) gsettings reset "$schema" "$key"
+           echo "    Reset to $(pretty "$default")."
+           break ;;
+      n|N) echo "    Kept."
+           break ;;
+      q|Q) exit 0 ;;
+    esac
+  done
+done

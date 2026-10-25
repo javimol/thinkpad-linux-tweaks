@@ -9,14 +9,23 @@ Tested on: ThinkPad X1 Extreme Gen 2 (i7 + GTX 1650 Max-Q), Ubuntu 24.04, NVIDIA
 |---|---|---|
 | [`gpu-toggle`](generic/gpu-toggle) | Switch between Intel-only and NVIDIA modes in one command, or automatically at boot | Any Ubuntu/Debian laptop with Intel + NVIDIA (Optimus) graphics |
 | [`fingerprint-lid`](generic/fingerprint-lid.pam-config) | Skip the fingerprint reader while the lid is closed, so typed passwords work straight away | Any Ubuntu/Debian laptop with a fingerprint reader set up through `fprintd` |
+| [`shortcut-check`](generic/shortcut-check) | Find GNOME keyboard shortcuts changed from the default, and reset them one by one | Any GNOME desktop |
 
 ## Install
 
 ```bash
 git clone https://github.com/javimol/thinkpad-linux-tweaks.git
 cd thinkpad-linux-tweaks
-sudo ./install.sh gpu-toggle
+sudo ./install.sh <tool>...   # one or more tools from the list below
+./install.sh --list           # show the available tools
 ```
+
+| Install command | What it installs |
+|---|---|
+| `sudo ./install.sh gpu-toggle` | The `gpu-toggle` command |
+| `sudo ./install.sh gpu-toggle-auto` | `gpu-toggle` plus the service that picks the mode at boot |
+| `sudo ./install.sh fingerprint-lid` | The PAM profile that skips the fingerprint reader with the lid closed |
+| `sudo ./install.sh shortcut-check` | The `shortcut-check` command (run it without `sudo`) |
 
 Or just copy the script you want into your `PATH`.
 
@@ -169,6 +178,18 @@ instead of the window you just left. To raise only the window you pick:
 
 ```bash
 gsettings set org.gnome.shell.extensions.tiling-assistant enable-raise-tile-group false
+```
+
+**Find shortcuts that changed by accident (GNOME).** If you record a shortcut
+in Settings while Fn Lock is off, the F-keys send their media functions, so
+Alt+F4 gets saved as `<Alt>AudioMicMute` and stops working. `shortcut-check`
+lists every shortcut that differs from the default, flags the ones saved with
+a media key, and asks whether to reset each one:
+
+```bash
+shortcut-check          # ask about each changed shortcut: reset or keep
+shortcut-check --list   # just print the changed shortcuts
+shortcut-check --all    # print every shortcut, marking the changed ones
 ```
 
 ## Contributing
