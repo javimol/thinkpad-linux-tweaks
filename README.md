@@ -116,6 +116,39 @@ sudo pam-auth-update --enable fprintd
 > ⚠️ This changes how you log in. Keep a root shell open (`sudo -i`) while you
 > test `sudo` in another terminal, with the lid open and closed.
 
+## Use it with the lid closed
+
+Two settings for working with the lid closed on an external monitor, from
+power-on to login.
+
+**Power on without opening the lid (ThinkPad).** The BIOS setting
+"Power On with AC Attach" starts the laptop when power is plugged in. You can
+set it from Linux (it takes effect at the next reboot):
+
+```bash
+echo Enable | sudo tee /sys/class/firmware-attributes/thinklmi/attributes/OnByAcAttach/current_value
+```
+
+To start it: shut down, unplug all power (including a USB-C monitor that
+charges the laptop), wait about 10 seconds, and plug back in. Shutting down
+while plugged in leaves it off. This doesn't work if a BIOS supervisor password
+is set; use the BIOS menu (F1 at boot) instead.
+
+**Don't suspend at login.** If you start the laptop with the lid closed, it
+can go to sleep the moment you log in, which looks like the external monitor
+going black. systemd is meant to ignore the lid while an external monitor is
+connected, but it doesn't see monitors on NVIDIA ports. GNOME covers for that
+once you're logged in, but not during the second or so it takes to log in. To
+never suspend on lid close while on AC:
+
+```bash
+sudo mkdir -p /etc/systemd/logind.conf.d
+printf '[Login]\nHandleLidSwitchExternalPower=ignore\n' | sudo tee /etc/systemd/logind.conf.d/50-lid-on-ac.conf
+```
+
+Reboot to apply it. On battery, closing the lid still suspends. On AC with no
+monitor, it no longer does; suspend from the menu instead.
+
 ## Desktop tweaks
 
 Small one-off settings, not tied to any hardware.
