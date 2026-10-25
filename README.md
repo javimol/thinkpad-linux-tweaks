@@ -8,6 +8,7 @@ Tested on: ThinkPad X1 Extreme Gen 2 (i7 + GTX 1650 Max-Q), Ubuntu 24.04, NVIDIA
 | Tool | What it does | Works on |
 |---|---|---|
 | [`gpu-toggle`](generic/gpu-toggle) | Switch between Intel-only and NVIDIA modes in one command, or automatically at boot | Any Ubuntu/Debian laptop with Intel + NVIDIA (Optimus) graphics |
+| [`fingerprint-lid`](generic/fingerprint-lid.pam-config) | Skip the fingerprint reader while the lid is closed, so typed passwords work straight away | Any Ubuntu/Debian laptop with a fingerprint reader set up through `fprintd` |
 
 ## Install
 
@@ -87,6 +88,33 @@ to exempt the GPU and its PCIe port.
 - The proprietary NVIDIA driver
 - systemd. The display manager (GDM, SDDM, LightDM, ...) is detected automatically.
   If it can't be detected, log out or reboot after switching.
+
+## fingerprint-lid
+
+### Why
+
+With fingerprint login on, `sudo` and the lock screen's password prompt try
+the fingerprint reader first and wait up to 10 seconds for a finger. With the
+lid closed and an external keyboard, you can't reach the reader, so every
+password takes 10 seconds longer.
+
+`fingerprint-lid` skips the reader while the lid is closed. With the lid open,
+fingerprint login works as before.
+
+```bash
+sudo ./install.sh fingerprint-lid
+```
+
+It replaces Ubuntu's stock fingerprint PAM profile (`fprintd`) with one that
+checks the lid first. To go back:
+
+```bash
+sudo pam-auth-update --disable fingerprint-lid
+sudo pam-auth-update --enable fprintd
+```
+
+> ⚠️ This changes how you log in. Keep a root shell open (`sudo -i`) while you
+> test `sudo` in another terminal, with the lid open and closed.
 
 ## Desktop tweaks
 

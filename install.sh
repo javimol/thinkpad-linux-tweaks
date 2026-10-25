@@ -9,7 +9,7 @@ set -euo pipefail
 REPO_DIR=$(cd "$(dirname "$0")" && pwd)
 PREFIX=${PREFIX:-/usr/local}
 
-TOOLS="gpu-toggle gpu-toggle-auto"
+TOOLS="gpu-toggle gpu-toggle-auto fingerprint-lid"
 
 install_gpu_toggle() {
   install -Dm755 "$REPO_DIR/generic/gpu-toggle" "$PREFIX/bin/gpu-toggle"
@@ -56,6 +56,17 @@ CONF
   tlp start >/dev/null 2>&1 || true
 }
 
+# PAM profile: skip the fingerprint reader while the lid is closed. Replaces
+# the stock fprintd profile, which it conflicts with.
+install_fingerprint_lid() {
+  install -Dm755 "$REPO_DIR/generic/lid-open" "$PREFIX/libexec/lid-open"
+  sed "s#/usr/local/libexec/#$PREFIX/libexec/#" "$REPO_DIR/generic/fingerprint-lid.pam-config" \
+    > /usr/share/pam-configs/fingerprint-lid
+  pam-auth-update --disable fprintd
+  pam-auth-update --enable fingerprint-lid
+  echo "Installed $PREFIX/libexec/lid-open and enabled the fingerprint-lid PAM profile"
+}
+
 if [ $# -eq 0 ] || [ "$1" = "--list" ]; then
   echo "Available tools: $TOOLS"
   echo "Usage: sudo $0 <tool>..."
@@ -71,6 +82,7 @@ for tool in "$@"; do
   case "$tool" in
     gpu-toggle) install_gpu_toggle ;;
     gpu-toggle-auto) install_gpu_toggle_auto ;;
+    fingerprint-lid) install_fingerprint_lid ;;
     *) echo "Unknown tool: $tool (available: $TOOLS)" >&2; exit 1 ;;
   esac
 done

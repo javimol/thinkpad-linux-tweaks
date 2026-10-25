@@ -1,0 +1,13 @@
+#!/bin/sh
+# lid-open: exit 0 if the laptop lid is open, 1 if it is closed.
+#
+# Used by the fingerprint-lid PAM profile to skip the fingerprint reader
+# while the lid is closed. If the lid state can't be read, it says "open",
+# so fingerprint login keeps working as before.
+
+for f in /proc/acpi/button/lid/*/state; do
+  if grep -q closed "$f" 2>/dev/null; then
+    exit 1
+  fi
+done
+exit 0
