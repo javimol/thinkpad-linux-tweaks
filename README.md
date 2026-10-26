@@ -160,7 +160,7 @@ monitor, it no longer does; suspend from the menu instead.
 
 ## Desktop tweaks
 
-Small one-off settings, not tied to any hardware.
+Small one-off settings that work on any laptop.
 
 **Snap windows left and right without interruption (Ubuntu).** After you snap
 a window to one half with Super+Right, Ubuntu's Tiling Assistant opens a
@@ -179,6 +179,20 @@ instead of the window you just left. To raise only the window you pick:
 ```bash
 gsettings set org.gnome.shell.extensions.tiling-assistant enable-raise-tile-group false
 ```
+
+**Make the screenshot key work on a Logitech keyboard (GNOME).** The
+screenshot key on Logitech keyboards such as the MX Keys Mini sends
+Super+Shift+S, the Windows snipping-tool shortcut, not Print. GNOME doesn't
+bind it, so the key does nothing. To open GNOME's screenshot tool with it,
+keeping Print as well:
+
+```bash
+gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Shift><Super>s']"
+```
+
+Depending on Fn Lock, you press the key on its own or with Fn. To see what
+any key sends, run `xinput test "<keyboard name>"` (names from `xinput list`)
+and press it.
 
 **Find shortcuts that changed by accident (GNOME).** If you record a shortcut
 in Settings while Fn Lock is off, the F-keys send their media functions, so
