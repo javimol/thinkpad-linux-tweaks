@@ -10,6 +10,7 @@ Tested on: ThinkPad X1 Extreme Gen 2 (i7 + GTX 1650 Max-Q), Ubuntu 24.04, NVIDIA
 | [`gpu-toggle`](generic/gpu-toggle) | Switch between Intel-only and NVIDIA modes in one command, or automatically at boot | Any Ubuntu/Debian laptop with Intel + NVIDIA (Optimus) graphics |
 | [`fingerprint-lid`](generic/fingerprint-lid.pam-config) | Skip the fingerprint reader while the lid is closed, so typed passwords work straight away | Any Ubuntu/Debian laptop with a fingerprint reader set up through `fprintd` |
 | [`shortcut-check`](generic/shortcut-check) | Find GNOME keyboard shortcuts changed from the default, and reset them one by one | Any GNOME desktop |
+| [`chrome-intel`](generic/chrome-intel) | Make Google Chrome decode video on the Intel GPU instead of the CPU | Any laptop with an Intel GPU running Google Chrome on X11 |
 
 ## Install
 
@@ -26,6 +27,7 @@ sudo ./install.sh <tool>...   # one or more tools from the list below
 | `sudo ./install.sh gpu-toggle-auto` | `gpu-toggle` plus the service that picks the mode at boot |
 | `sudo ./install.sh fingerprint-lid` | The PAM profile that skips the fingerprint reader with the lid closed |
 | `sudo ./install.sh shortcut-check` | The `shortcut-check` command (run it without `sudo`) |
+| `sudo ./install.sh chrome-intel` | The `chrome-intel` launcher (then run `chrome-intel --setup` without `sudo`) |
 
 Or just copy the script you want into your `PATH`.
 
@@ -205,6 +207,25 @@ shortcut-check          # ask about each changed shortcut: reset or keep
 shortcut-check --list   # just print the changed shortcuts
 shortcut-check --all    # print every shortcut, marking the changed ones
 ```
+
+**Decode video in Chrome on the Intel GPU (X11).** Chrome plays video on the
+CPU on this laptop, even though the Intel GPU can decode it. Chrome only uses
+hardware decode when its Vulkan device and its video device are both the Intel
+GPU. With the NVIDIA driver loaded (on-demand mode) it picks NVIDIA for both,
+and Chrome doesn't decode on NVIDIA by default. `chrome-intel` starts Chrome
+with both pinned to Intel. That works the same in intel and on-demand mode,
+and leaves the NVIDIA GPU free to power off:
+
+```bash
+chrome-intel --setup   # make the Chrome menu entry and web apps use it
+chrome-intel --undo    # back to the stock launchers
+```
+
+Then quit Chrome completely (Ctrl+Shift+Q) and start it from the menu. To
+check, play a video, open `chrome://media-internals`, select the player and
+look for `kVideoDecoderName: VaapiVideoDecoder`. `FFmpegVideoDecoder` or
+`VpxVideoDecoder` means it is still decoding on the CPU. Chrome rewrites a web
+app's shortcut when you reinstall the app, so run `--setup` again after that.
 
 ## Contributing
 

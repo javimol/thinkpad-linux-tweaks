@@ -1,0 +1,93 @@
+#!/bin/bash
+# chrome-intel: run Google Chrome on the Intel GPU with hardware video decode
+#
+# Usage: chrome-intel [chrome options]   start Chrome
+#        chrome-intel --setup            make the Chrome menu entry and web
+#                                        app shortcuts start Chrome this way
+#        chrome-intel --undo             go back to the stock launchers
+#
+# Chrome only decodes video in hardware (VA-API) when its Vulkan device and
+# its VA-API render node are both the Intel GPU. With the NVIDIA driver loaded
+# it picks NVIDIA for both, and video falls back to the CPU.
+
+set -euo pipefail
+
+CHROME=/opt/google/chrome/google-chrome
+STOCK_DESKTOP=/usr/share/applications/google-chrome.desktop
+APPS=${XDG_DATA_HOME:-$HOME/.local/share}/applications
+MARK="X-Chrome-Intel=true"
+
+usage() {
+  echo "Usage: $(basename "$0") [--setup|--undo|chrome options]"
+}
+
+# /dev/dri/renderD128 or similar, empty if there is no Intel GPU
+intel_render_node() {
+  local node
+  for node in /sys/class/drm/renderD*; do
+    if [ "$(cat "$node/device/vendor" 2>/dev/null)" = "0x8086" ]; then
+      echo "/dev/dri/${node##*/}"
+      return
+    fi
+  done
+}
+
+launch() {
+  local node icd=/usr/share/vulkan/icd.d/intel_icd.json
+  node=$(intel_render_node)
+  if [ -n "$node" ] && [ -f "$icd" ]; then
+    export VK_DRIVER_FILES=$icd
+    set -- --render-node-override="$node" --use-angle=vulkan \
+      --enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan,AcceleratedVideoDecodeLinuxGL \
+      "$@"
+  else
+    echo "chrome-intel: no Intel GPU or Intel Vulkan driver; starting Chrome as usual" >&2
+  fi
+  exec "$CHROME" "$@"
+}
+
+setup() {
+  local self f
+  self=$(readlink -f "$0")
+  mkdir -p "$APPS"
+
+  # A copy in ~/.local/share/applications hides the system entry, and is
+  # also what opens links from other apps
+  sed "s#^Exec=/usr/bin/google-chrome-stable#Exec=$self#; /^\[Desktop Entry\]/a $MARK" \
+    "$STOCK_DESKTOP" > "$APPS/google-chrome.desktop"
+  echo "Wrote $APPS/google-chrome.desktop"
+
+  # Web app shortcuts that Chrome created ("Install app"). Chrome rewrites
+  # them when an app is reinstalled, so run --setup again after that.
+  for f in "$APPS"/chrome-*.desktop; do
+    [ -e "$f" ] || continue
+    grep -q "^Exec=$CHROME " "$f" || continue
+    sed -i "s#^Exec=$CHROME #Exec=$self #" "$f"
+    echo "Updated $f"
+  done
+  update-desktop-database "$APPS" 2>/dev/null || true
+  echo "Quit Chrome completely (Ctrl+Shift+Q) and start it again from the menu."
+}
+
+undo() {
+  local self f
+  self=$(readlink -f "$0")
+  if grep -q "^$MARK" "$APPS/google-chrome.desktop" 2>/dev/null; then
+    rm "$APPS/google-chrome.desktop"
+    echo "Removed $APPS/google-chrome.desktop"
+  fi
+  for f in "$APPS"/chrome-*.desktop; do
+    [ -e "$f" ] || continue
+    grep -q "^Exec=$self " "$f" || continue
+    sed -i "s#^Exec=$self #Exec=$CHROME #" "$f"
+    echo "Restored $f"
+  done
+  update-desktop-database "$APPS" 2>/dev/null || true
+}
+
+case "${1:-}" in
+  --setup) setup ;;
+  --undo) undo ;;
+  -h|--help) usage ;;
+  *) launch "$@" ;;
+esac
