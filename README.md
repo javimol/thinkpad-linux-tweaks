@@ -145,6 +145,19 @@ charges the laptop), wait about 10 seconds, and plug back in. Shutting down
 while plugged in leaves it off. This doesn't work if a BIOS supervisor password
 is set; use the BIOS menu (F1 at boot) instead.
 
+It fires once, when the laptop goes from no power to power. A USB-C monitor
+that charges the laptop counts as power: if it's still connected, plugging in
+the charger isn't a new event, and the laptop stays off. If the monitor powers
+the laptop on during the night, that uses up the event too.
+
+The BIOS setting "Wake by Thunderbolt" can also start the laptop on its own
+when a monitor on the USB-C port changes state, for example coming out of
+standby. If the laptop turns itself on at night, disable it:
+
+```bash
+echo Disable | sudo tee /sys/class/firmware-attributes/thinklmi/attributes/WakeByThunderbolt/current_value
+```
+
 **Don't suspend at login.** If you start the laptop with the lid closed, it
 can go to sleep the moment you log in, which looks like the external monitor
 going black. systemd is meant to ignore the lid while an external monitor is
