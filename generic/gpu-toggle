@@ -49,8 +49,11 @@ unload_nvidia() {
   local i
   systemctl stop nvidia-persistenced 2>/dev/null
   for i in 1 2 3 4 5; do
+    # -C /dev/null: in intel mode prime-select aliases the modules to "off",
+    # which turns a plain modprobe -r into a silent no-op
     # shellcheck disable=SC2086
-    modprobe -r $NVIDIA_MODULES 2>/dev/null && return 0
+    modprobe -C /dev/null -r $NVIDIA_MODULES 2>/dev/null
+    lsmod | grep -q '^nvidia ' || return 0
     sleep 1
   done
   return 1

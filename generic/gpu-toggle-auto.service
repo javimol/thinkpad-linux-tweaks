@@ -7,6 +7,8 @@ Before=display-manager.service gpu-manager.service
 
 [Service]
 Type=oneshot
+# Run once per boot, not again each time gpu-toggle restarts the display manager
+RemainAfterExit=yes
 ExecStart=/usr/local/bin/gpu-toggle auto
 # Switching modes rebuilds the initramfs
 TimeoutStartSec=180
