@@ -10,7 +10,7 @@ Tested on: ThinkPad X1 Extreme Gen 2 (i7 + GTX 1650 Max-Q), Ubuntu 24.04, NVIDIA
 | [`gpu-toggle`](generic/gpu-toggle) | Switch between Intel-only and NVIDIA modes in one command, or automatically at boot | Any Ubuntu/Debian laptop with Intel + NVIDIA (Optimus) graphics |
 | [`fingerprint-lid`](generic/fingerprint-lid.pam-config) | Skip the fingerprint reader while the lid is closed, so typed passwords work straight away | Any Ubuntu/Debian laptop with a fingerprint reader set up through `fprintd` |
 | [`shortcut-check`](generic/shortcut-check) | Find GNOME keyboard shortcuts changed from the default, and reset them one by one | Any GNOME desktop |
-| [`chrome-intel`](generic/chrome-intel) | Make Google Chrome decode video on the Intel GPU instead of the CPU | Any laptop with an Intel GPU running Google Chrome on X11 |
+| [`chrome-intel`](generic/chrome-intel) | Make Google Chrome decode video on the Intel GPU instead of the CPU | Any laptop with an Intel GPU running Google Chrome (X11 or Wayland) |
 
 ## Install
 
@@ -207,7 +207,16 @@ gsettings set org.gnome.shell.keybindings show-screenshot-ui "['Print', '<Shift>
 
 Depending on Fn Lock, you press the key on its own or with Fn. To see what
 any key sends, run `xinput test "<keyboard name>"` (names from `xinput list`)
-and press it.
+and press it. On Wayland, use `sudo libinput debug-events` instead.
+
+**Keep window shortcuts working while a menu is open (GNOME).** On X11, an
+open menu (Chrome's ⋮ menu, a right-click menu, ...) takes the whole keyboard,
+so GNOME shortcuts such as Super+Shift+Left/Right (move a window to another
+monitor) or Ctrl+Alt+Left/Right (switch workspace) do nothing until you press
+Esc. On Wayland, GNOME sees every key first, so they work with a menu open.
+To switch, log out, click the gear icon on the login screen and pick
+"Ubuntu on Wayland". The login screen remembers the choice; pick "Ubuntu" to
+go back to X11. `chrome-intel` works on both.
 
 **Find shortcuts that changed by accident (GNOME).** If you record a shortcut
 in Settings while Fn Lock is off, the F-keys send their media functions, so
@@ -221,10 +230,10 @@ shortcut-check --list   # just print the changed shortcuts
 shortcut-check --all    # print every shortcut, marking the changed ones
 ```
 
-**Decode video in Chrome on the Intel GPU (X11).** Chrome plays video on the
-CPU on this laptop, even though the Intel GPU can decode it. Chrome only uses
-hardware decode when its Vulkan device and its video device are both the Intel
-GPU. With the NVIDIA driver loaded (on-demand mode) it picks NVIDIA for both,
+**Decode video in Chrome on the Intel GPU (X11 or Wayland).** Chrome plays
+video on the CPU on this laptop, even though the Intel GPU can decode it.
+Chrome only uses hardware decode when its Vulkan device and its video device
+are both the Intel GPU. With the NVIDIA driver loaded (on-demand mode) it picks NVIDIA for both,
 and Chrome doesn't decode on NVIDIA by default. `chrome-intel` starts Chrome
 with both pinned to Intel. That works the same in intel and on-demand mode,
 and leaves the NVIDIA GPU free to power off:
@@ -239,6 +248,14 @@ check, play a video, open `chrome://media-internals`, select the player and
 look for `kVideoDecoderName: VaapiVideoDecoder`. `FFmpegVideoDecoder` or
 `VpxVideoDecoder` means it is still decoding on the CPU. Chrome rewrites a web
 app's shortcut when you reinstall the app, so run `--setup` again after that.
+
+`Dav1dVideoDecoder` means the video is AV1. The UHD 630 can't decode AV1 in
+hardware, and YouTube often sends it. To get VP9 instead, which the GPU does
+decode, install the
+[enhanced-h264ify](https://chromewebstore.google.com/detail/enhanced-h264ify/omkfmpieigblcllmkgbflkikinpkodlk)
+extension and, in its options, block only AV1. Its defaults block everything
+but H.264, which caps YouTube at 1080p. Right-click a YouTube video, then
+"Stats for nerds": the Codecs line should show `vp09`, not `av01`.
 
 ## Contributing
 
